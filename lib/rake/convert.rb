@@ -4,20 +4,6 @@ $convert   = false
 $makefile  = ''
 $configure = ''
 
-clean = []
-
-if (Rake::Task[:clean] rescue nil) || (Rake::Task[:clobber] rescue nil)
-  if defined?(CLOBBER)
-    CLOBBER.include 'configure', 'Makefile'
-  end
-
-  if (Rake::Task[:clobber] rescue nil)
-    clean << :clobber
-  elsif (Rake::Task[:clean] rescue nil)
-    clean << :clean
-  end
-end
-
 # Makefile stuff
   def sh (args)
     if $convert
@@ -239,7 +225,7 @@ end
 # configure stuff
 
 desc 'Convert the Rakefile to Makefile/configure'
-task :convert => clean do |task|
+task :convert, [:makefile, :configure] do |task, args|
   class << task
     def escape (name)
       name.gsub(/[:]/, '_')
@@ -288,6 +274,20 @@ task :convert => clean do |task|
     end
   end
 
+  args.with_defaults(makefile: 'Makefile', configure: 'configure')
+
+  if (Rake::Task[:clean] rescue nil) || (Rake::Task[:clobber] rescue nil)
+    if defined?(CLOBBER)
+      CLOBBER.include args.makefile, args.configure
+    end
+
+    if (Rake::Task[:clobber] rescue nil)
+      Rake::Task[:clobber].invoke
+    elsif (Rake::Task[:clean] rescue nil)
+      Rake::Task[:clean].invoke
+    end
+  end
+
   $convert = true
 
   task.add_env(EXPORT)
@@ -314,11 +314,11 @@ task :convert => clean do |task|
     $makefile << "\trm -rf #{f}\n"
   end
   
-  File.open('Makefile', 'w') {|f|
+  File.open(args.makefile, 'w') {|f|
     f.write $makefile
   }
 
-  File.open('configure', 'w', 0755) {|f|
+  File.open(args.configure, 'w', 0755) {|f|
     f.puts 'CC=${CC:-gcc}'
     f.puts 'LIBS='
     f.puts 'FILE=`mktemp -u`'
