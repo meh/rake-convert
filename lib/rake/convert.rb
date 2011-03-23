@@ -283,7 +283,7 @@ task :convert => clean do |task|
 
     def add_env (*names)
       names.flatten.compact.each {|name|
-        $makefile << "#{name} = #{eval("::#{name}")}\n" if eval("::#{name}") rescue nil
+        $makefile << "#{name} = #{eval("::#{name.to_s.gsub(/\$\{(.*?)\}/, '$(\1)')}")}\n" if eval("::#{name}") rescue nil
       }
     end
   end
