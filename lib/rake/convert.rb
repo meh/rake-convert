@@ -30,38 +30,197 @@ end
 # Makefile stuff
 
 # configure stuff
-  alias __have_library have_library
-  alias __have_func    have_func
-  alias __have_macro   have_macro
-  alias __check_sizeof check_sizeof
+if $".grep(/mkmf\.rb$/).first
+  alias __have_header   have_header
+  alias __have_library  have_library
+  alias __have_func     have_func
+  alias __have_macro    have_macro
+  alias __check_sizeof  check_sizeof
+  alias __create_header create_header
 
-  def have_library (*args, &block)
-    if $generate
+  def have_header (header, preheaders = nil, &block)
+    source = nil
+    result = __have_header(header, preheaders) {|c|
+      source = block ? block.call(c) : c
+    }
+
+    source.sub!('#include "ruby.h"', '')
+
+    if $convert
+      $configure << %{
+
+cat > $FILE.c <<EOF
+#{source}
+EOF
+
+echo -n "Checking for #{header}... "
+if [[ "`($CC $CFLAGS -c $FILE.c) 2>&1`" == "" ]]; then
+  DEFS="$DEFS\\n#define #{"HAVE_#{header.tr_cpp}"} 1"
+
+  echo yes
+else
+  echo no
+fi
+
+      }
     end
 
-    __have_library(*args, &block)
+    result
   end
 
-  def have_func (*args, &block)
-    if $generate
+  def have_library (lib, func = nil, headers = nil, &block)
+    source = nil
+    result = __have_library(lib, func, headers) {|c|
+      source = block ? block.call(c) : c
+    }
+
+    source.sub!('#include "ruby.h"', '')
+
+    if $convert
+      $configure << %{
+
+cat > $FILE.c <<EOF
+#{source}
+EOF
+
+echo -n "Checking for #{lib}... "
+if [[ "`($CC $CFLAGS -o $FILE -c $FILE.c -l#{lib}) 2>&1`" == "" ]]; then
+  echo yes
+else
+  echo no
+
+  echo "Install #{lib} and try again"
+
+  exit 1
+fi
+
+      }
     end
 
-    __have_func(*args, &block)
+    result
   end
 
-  def have_macro (*args, &block)
-    if $generate
+  def have_func (func, headers = nil, &block)
+    source = nil
+    result = __have_func(func, headers) {|c|
+      source = block ? block.call(c) : c
+    }
+
+    source.sub!('#include "ruby.h"', '')
+
+    if $convert
+      $configure << %{
+
+cat > $FILE.c <<EOF
+#{source}
+EOF
+
+echo -n "Checking for #{func}()#{" in #{[headers].flatten.join(' ')}" if headers}... "
+if [[ "`($CC $CFLAGS -Wall -c $FILE.c) 2>&1`" == "" ]]; then
+  DEFS="$DEFS\\n#define #{"HAVE_#{func.tr_cpp}"} 1"
+
+  echo yes
+else
+  echo no
+fi
+
+      }
     end
 
-    __have_macro(*args, &block)
+    result
   end
 
-  def check_sizeof (*args, &block)
-    if $generate
+  def have_macro (macro, headers = nil, opts = '', &block)
+    source = nil
+    result = __have_macro(macro, headers, opts) {|c|
+      source = block ? block.call(c) : c
+    }
+
+    source.sub!('#include "ruby.h"', '')
+
+    if $convert
+      $configure << %{
+
+cat > $FILE.c <<EOF
+#{source}
+EOF
+
+echo -n "Checking for #{macro}#{" in #{[headers].flatten.join(' ')}" if headers}... "
+if [[ "`($CC $CFLAGS -c $FILE.c) 2>&1`" == "" ]]; then
+  DEFS="$DEFS\\n#define #{"HAVE_#{macro.tr_cpp}"} 1"
+
+  echo yes
+else
+  echo no
+fi
+
+      }
     end
 
-    __check_sizeof(*args, &block)
+    result
   end
+
+  def check_sizeof (type, headers = nil, opts = '', &block)
+    source = nil
+    result = __check_sizeof(type, headers, opts) {|c|
+      source = block ? block.call(c) : c
+    }
+
+    source.sub!('#include "ruby.h"', '')
+
+    if $convert
+      $configure << %{
+
+cat > $FILE.c <<EOF
+#{source}
+EOF
+
+$CC $CFLAGS -o $FILE $FILE.c
+
+echo -n "Checking size of #{type}#{" in #{[headers].flatten.join(' ')}" if headers}... "
+if [[ "`($CC $CFLAGS -o $FILE $FILE.c) 2>&1`" == "" ]]; then
+  SIZE=$(exec $FILE)
+  DEFS="$DEFS\\n#define #{"SIZEOF_#{type.tr_cpp}"} $SIZE"
+
+  echo $SIZE
+else
+  echo no
+
+  echo "Could not define size of #{type}"
+
+  exit 1
+fi
+
+      }
+    end
+
+    result
+  end
+
+  def create_header (header = 'extconf.h')
+    if $convert
+      $configure << %{
+
+cat > #{header} <<EOF
+#ifndef #{header.tr_cpp}
+#define #{header.tr_cpp}
+EOF
+
+echo -e $DEFS >> #{header}
+
+cat >> #{header} <<EOF
+
+#endif
+EOF
+
+DEFS=
+
+      }
+    end
+
+    __create_header(header)
+  end
+end
 # configure stuff
 
 desc 'Convert the Rakefile to Makefile/configure'
@@ -144,5 +303,14 @@ task :convert => clean do |task|
     f.write $makefile
   }
 
+  File.open('configure', 'w', 0755) {|f|
+    f.write "CC=${CC:-gcc}\n"
+    f.write "FILE=`mktemp -u`\n"
+    f.write "DEFS=\n"
+
+    f.write $configure
+  }
+
   $makefile = ''
+  $configure = ''
 end
