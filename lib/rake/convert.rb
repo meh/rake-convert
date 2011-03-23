@@ -99,8 +99,10 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{lib}... "
-if [[ "`($CC $CFLAGS -o $FILE $FILE.c -l#{lib}) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -o $FILE $FILE.c -l#{lib} $LIBS) 2>&1`" == "" ]]; then
   LAST=yes
+
+  LIBS="$LIBS -l#{lib}"
 else
   LAST=no
 fi
@@ -317,9 +319,10 @@ task :convert => clean do |task|
   }
 
   File.open('configure', 'w', 0755) {|f|
-    f.write "CC=${CC:-gcc}\n"
-    f.write "FILE=`mktemp -u`\n"
-    f.write "DEFS=\n"
+    f.puts 'CC=${CC:-gcc}'
+    f.puts 'LIBS='
+    f.puts 'FILE=`mktemp -u`'
+    f.puts 'DEFS='
 
     f.write $configure
   }
