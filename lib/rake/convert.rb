@@ -30,6 +30,21 @@ end
 # Makefile stuff
 
 # configure stuff
+def die (text)
+  if $convert
+    $configure << %{
+
+if [[ "$LAST" == "no" ]]; then
+  echo -e "#{text}"
+  exit 1
+fi
+
+    }
+  else
+    fail(text)
+  end
+end
+
 if $".grep(/mkmf\.rb$/).first
   alias __have_header   have_header
   alias __have_library  have_library
@@ -65,7 +80,7 @@ fi
       }
     end
 
-    result
+    $convert ? false : result
   end
 
   def have_library (lib, func = nil, headers = nil, &block)
@@ -84,20 +99,18 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{lib}... "
-if [[ "`($CC $CFLAGS -o $FILE -c $FILE.c -l#{lib}) 2>&1`" == "" ]]; then
-  echo yes
+if [[ "`($CC $CFLAGS -o $FILE $FILE.c -l#{lib}) 2>&1`" == "" ]]; then
+  LAST=yes
 else
-  echo no
-
-  echo "Install #{lib} and try again"
-
-  exit 1
+  LAST=no
 fi
+
+echo $LAST
 
       }
     end
 
-    result
+    $convert ? false : result
   end
 
   def have_func (func, headers = nil, &block)
@@ -127,7 +140,7 @@ fi
       }
     end
 
-    result
+    $convert ? false : result
   end
 
   def have_macro (macro, headers = nil, opts = '', &block)
@@ -157,7 +170,7 @@ fi
       }
     end
 
-    result
+    $convert ? false : result
   end
 
   def check_sizeof (type, headers = nil, opts = '', &block)
@@ -194,7 +207,7 @@ fi
       }
     end
 
-    result
+    $convert ? false : result
   end
 
   def create_header (header = 'extconf.h')
