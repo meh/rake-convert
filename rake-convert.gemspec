@@ -1,6 +1,6 @@
 Gem::Specification.new {|s|
     s.name         = 'rake-convert'
-    s.version      = '0.0.2.3'
+    s.version      = '0.0.3'
     s.author       = 'meh.'
     s.email        = 'meh@paranoici.org'
     s.homepage     = 'http://github.com/meh/rake-convert'
