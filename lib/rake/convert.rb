@@ -36,7 +36,7 @@ def die (text)
 
 if [[ "$LAST" == "no" ]]; then
   echo -e "#{text}"
-  exit 1
+  do_exit
 fi
 
     }
@@ -69,7 +69,7 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{header}... "
-if [[ "`($CC $CFLAGS -c $FILE.c) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -pipe -o $FILE -c $FILE.c) 2>&1`" == "" ]]; then
   DEFS="$DEFS\\n#define #{"HAVE_#{header.tr_cpp}"} 1"
 
   echo yes
@@ -99,7 +99,7 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{lib}... "
-if [[ "`($CC $CFLAGS -o $FILE $FILE.c -l#{lib} $LIBS) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -pipe -o $FILE $FILE.c -l#{lib} $LIBS) 2>&1`" == "" ]]; then
   LAST=yes
 
   LIBS="$LIBS -l#{lib}"
@@ -131,7 +131,7 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{func}()#{" in #{[headers].flatten.join(' ')}" if headers}... "
-if [[ "`($CC $CFLAGS -Wall -c $FILE.c) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -Wall -pipe -o $FILE -c $FILE.c) 2>&1`" == "" ]]; then
   DEFS="$DEFS\\n#define #{"HAVE_#{func.tr_cpp}"} 1"
 
   echo yes
@@ -161,7 +161,7 @@ cat > $FILE.c <<EOF
 EOF
 
 echo -n "Checking for #{macro}#{" in #{[headers].flatten.join(' ')}" if headers}... "
-if [[ "`($CC $CFLAGS -c $FILE.c) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -pipe -o $FILE -c $FILE.c) 2>&1`" == "" ]]; then
   DEFS="$DEFS\\n#define #{"HAVE_#{macro.tr_cpp}"} 1"
 
   echo yes
@@ -193,7 +193,7 @@ EOF
 $CC $CFLAGS -o $FILE $FILE.c
 
 echo -n "Checking size of #{type}#{" in #{[headers].flatten.join(' ')}" if headers}... "
-if [[ "`($CC $CFLAGS -o $FILE $FILE.c) 2>&1`" == "" ]]; then
+if [[ "`($CC $CFLAGS -pipe -o $FILE $FILE.c) 2>&1`" == "" ]]; then
   SIZE=$(exec $FILE)
   DEFS="$DEFS\\n#define #{"SIZEOF_#{type.tr_cpp}"} $SIZE"
 
@@ -324,7 +324,12 @@ task :convert => clean do |task|
     f.puts 'FILE=`mktemp -u`'
     f.puts 'DEFS='
 
-    f.write $configure
+    f.puts 'function do_clean { rm -f $FILE; rm -f $FILE.c; rm -f $FILE.o; }'
+    f.puts 'function do_exit { do_clean; exit 1; }'
+
+    f.puts $configure
+
+    f.puts 'do_clean'
   }
 
   $makefile = ''
